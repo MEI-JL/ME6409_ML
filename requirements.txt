@@ -1,0 +1,8 @@
+numpy
+notebook
+jupyter
+# replace torch ver. depending on your cuda ver.
+torch==2.7.0
+matplotlib
+pandas
+scikit-learn
