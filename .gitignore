@@ -1,9 +1,6 @@
+# specific to this dataset
 ProcessedData/
-
-
-.ipynb_checkpoints
-uv.lock
-
+*.csv
 
 # Environments
 .env
@@ -14,8 +11,11 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-
+uv.lock
 
 .vscode/
-
 __pycache__/
+.ipynb_checkpoints
+
+# pytorch checkpoints
+*.pt
