@@ -1,3 +1,5 @@
+from typing import Literal
+
 SUBJECTS = ['AB01','AB02','AB03','AB05','AB06','AB07',
             'AB08','AB09','AB10','AB11','AB12','AB13']
 
@@ -15,11 +17,11 @@ WINDOW_SIZE = 50   # 50 samples @ 200 Hz = 250 ms of history
 STRIDE = 5         # skip 5 samples between windows (for speed)
 
 FEATURE_COLS = [
-    'knee_angle', 'knee_velocity',                                    # Kinematics (2)
-    'RThigh_V_ACCX', 'RThigh_V_ACCY', 'RThigh_V_ACCZ',             # Thigh accel (3)
-    'RThigh_V_GYROX', 'RThigh_V_GYROY', 'RThigh_V_GYROZ',          # Thigh gyro (3)
-    'RShank_V_ACCX', 'RShank_V_ACCY', 'RShank_V_ACCZ',             # Shank accel (3)
-    'RShank_V_GYROX', 'RShank_V_GYROY', 'RShank_V_GYROZ',          # Shank gyro (3)
+    'knee_angle', 'knee_velocity',                        # Kinematics (2)
+    'RThigh_V_ACCX', 'RThigh_V_ACCY', 'RThigh_V_ACCZ',    # Thigh accel (3)
+    'RThigh_V_GYROX', 'RThigh_V_GYROY', 'RThigh_V_GYROZ', # Thigh gyro (3)
+    'RShank_V_ACCX', 'RShank_V_ACCY', 'RShank_V_ACCZ',    # Shank accel (3)
+    'RShank_V_GYROX', 'RShank_V_GYROY', 'RShank_V_GYROZ', # Shank gyro (3)
 ]
 TARGET_COL = 'knee_moment'
 
@@ -38,3 +40,7 @@ IMU_SHANK_COLS = [
 ]
 
 FEATURE_PREFIXES = ["angle", "velocity", "imu_sim", "moment"]
+
+SENSOR_NAMES = Literal["angle", "velocity", "imu_thigh", "imu_shank"]
+
+HIDDEN_LAYER_SIZE = 64
