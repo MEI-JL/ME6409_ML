@@ -5,14 +5,23 @@ from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
 from sklearn.preprocessing import StandardScaler
 from typing import Literal, List, Tuple, Any, Dict
+from dataclasses import dataclass, field
 from helpers.constants import *
 
 # from provided ME6409_ML_Workshop.ipynb
+@dataclass
+class DatasetConfig:
+    # does not contain subjects, since they will change frequently in LOSO
+    tasks: list = field(default_factory=lambda: PERIODIC_TASK_PREFIXES + NON_PERIODIC_TASK_PREFIXES)
+    window_size: int = WINDOW_SIZE
+    stride: int = STRIDE
+    dataset_folder: str = "ProcessedData"
+    ablated_sensor: Literal["angle", "velocity", "imu_sim"] | None = None
+
 
 def get_subject_task_paths(subject:str, task_prefix:str, 
                            base:str = "ProcessedData") -> List[Any]:
     base_path = Path(__file__).resolve().parent.parent
-    # import pdb; pdb.set_trace()
     subject_path = base_path / base / subject
 
     if not subject_path.exists():
@@ -21,28 +30,22 @@ def get_subject_task_paths(subject:str, task_prefix:str,
 
     return sorted(paths_list)
 
-def _find_suffix_csv_file(path, suffix):
+def find_suffix_csv_file(path, suffix):
     candidates = path.glob("*" + suffix + ".csv")
     for candidate in candidates:
         if candidate.exists():
             return candidate
     return None
 
-def load_trial(path:Any, #str or posixpath? 
+def _load_trial(path:Any, #str or posixpath? 
                  ablated_sensor: Literal[
                      "angle", "velocity", "imu_sim", "imu_thigh", "imu_shank"
                      ] | None = None
-            #    )->Tuple[pd.DataFrame, List[str]]:
                )-> pd.DataFrame:
-    # TODO handle the case were returns none
-    # angle  = pd.read_csv(_find_suffix_csv_file(path, "angle"))
-    # vel    = pd.read_csv(_find_suffix_csv_file(path, "velocity"))
-    # imu    = pd.read_csv(_find_suffix_csv_file(path, "imu_sim"))
-    # moment = pd.read_csv(_find_suffix_csv_file(path, "moment"))
 
     csv_file_paths = {}
     for prefix in FEATURE_PREFIXES:
-         csv_file_path = _find_suffix_csv_file(path, prefix)
+         csv_file_path = find_suffix_csv_file(path, prefix)
          if csv_file_path is None: return pd.DataFrame() # if cannot find file, return empty
 
          csv_file_paths[prefix] = csv_file_path
@@ -67,7 +70,7 @@ def load_trial(path:Any, #str or posixpath?
 
     df['knee_moment'] = moment['knee_angle_r_moment']
 
-    return df.dropna(subset=['knee_moment']) #, feature_cols
+    return df.dropna(subset=['knee_moment'])
 
 
 def _create_windows(X:np.ndarray, y:np.ndarray, 
@@ -93,22 +96,17 @@ def _create_windows(X:np.ndarray, y:np.ndarray,
 # only the virtual encoders and distributed IMUs
 # Maybe I need to write the filtered data into new files instead...
 class KneeMomentDataset(Dataset):
-    def __init__(self, subjects: List[str], tasks: list[str], 
-                 window_size = WINDOW_SIZE, 
-                 stride = STRIDE,
-                 dataset_folder = "ProcessedData",
+    def __init__(self, subjects: List[str], 
+                 cfg: DatasetConfig = DatasetConfig(),
                  scaler_X: StandardScaler | None = None,
                  scaler_y: StandardScaler | None = None,
-                 ablated_sensor: Literal[
-                     "angle", "velocity", "imu_sim", "imu_thigh", "imu_shank"
-                     ] | None = None
                  ):
         super().__init__()
         # stored as list of segemented tensors.
         # since we need to get statistics of all dataset, we want to concatenate them 
         # into one array, but later when creating windows, different time series data 
         # might be concatenated in the same window which is undesired.
-    
+        tasks = cfg.tasks
         if not isinstance(tasks, list) or not isinstance(tasks[0], str):
             # or will search for all files containing chars in string
             raise TypeError("tasks must be a list of strings.")
@@ -124,10 +122,10 @@ class KneeMomentDataset(Dataset):
         # resolve path and load from CSV file.
         for subject in subjects:
             for task in tasks:
-                paths = get_subject_task_paths(subject, task, dataset_folder)
+                paths = get_subject_task_paths(subject, task, cfg.dataset_folder)
 
                 for path in paths:
-                    df = load_trial(path, ablated_sensor=ablated_sensor)
+                    df = _load_trial(path, ablated_sensor=cfg.ablated_sensor)
                     if df.empty:
                         continue
                     # load TODO maybe use sine and cosine for IMU angles...
@@ -147,8 +145,6 @@ class KneeMomentDataset(Dataset):
                     dataset_y.extend(y_raw)
         
         if not dataset_X: # empty
-            # raise ValueError("cannot find required data in dataset.")
-            # print("cannot find required data in dataset.")
             self.X = []
             self.y = []
             return
@@ -175,7 +171,7 @@ class KneeMomentDataset(Dataset):
 
         # split them into windows - this is the data pulled in getitem
         X_windows, y_windows = _create_windows(X_scaled, y_scaled, dataset_samples_indices, 
-                                                window_size, stride)
+                                                cfg.window_size, cfg.stride)
         # conv1d input: (N, C_in, L) / (batch, channels, length)
         # lstm input: (L, N, H_in) when batch_first = False (H is input size)
         # but for consistency, always place batches at the first dim.
@@ -192,12 +188,10 @@ class KneeMomentDataset(Dataset):
         return self.X[idx], self.y[idx]
 
 
-def create_LOSO_dataset_dataloader(leave_one_out_subject:str, tasks:List[str], 
-                                   subjects: List[str] = SUBJECTS,
+def create_LOSO_dataset_dataloader(leave_one_out_subject: str,
+                                   subjects: List[str] = SUBJECTS, # different from that in dataset
+                                   dataset_cfg: DatasetConfig = DatasetConfig(),
                                    batch_size = 32,
-                                   window_size = WINDOW_SIZE,
-                                   stride = STRIDE,
-                                   ablated_sensor: Literal["angle", "velocity", "imu_sim"] | None = None
                                    ) -> Tuple[Dataset, Dataset, DataLoader, DataLoader] | None:
     # returns train/test dataset and dataloader.
     # test (more like validation) set is from the left out subject
@@ -205,17 +199,8 @@ def create_LOSO_dataset_dataloader(leave_one_out_subject:str, tasks:List[str],
     # construct remaining subject list
     train_subjects = [s for s in subjects if s != leave_one_out_subject]
 
-    # try:
-    #     train_dataset = KneeMomentDataset(train_subjects,tasks, window_size, stride)
-    #     test_dataset = KneeMomentDataset([leave_one_out_subject], tasks, window_size, stride,
-    #                                     scaler_X = train_dataset.scaler_X,
-    #                                     scaler_y = train_dataset.scaler_y) # Fit scaler on TRAINING data only!
-    # except ValueError:
-    #     print("Data not found in subject, returning None")
-    #     return None
-
-    train_dataset = KneeMomentDataset(train_subjects,tasks, window_size, stride)
-    test_dataset = KneeMomentDataset([leave_one_out_subject], tasks, window_size, stride,
+    train_dataset = KneeMomentDataset(train_subjects, cfg = dataset_cfg)
+    test_dataset = KneeMomentDataset([leave_one_out_subject], cfg = dataset_cfg,
                                     scaler_X = train_dataset.scaler_X,
                                     scaler_y = train_dataset.scaler_y) # Fit scaler on TRAINING data only!
     

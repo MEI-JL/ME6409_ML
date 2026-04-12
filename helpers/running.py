@@ -4,9 +4,9 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
-from typing import List, Tuple, Dict, Any, Literal
+from typing import List, Tuple, Dict, Any
 
-from helpers.data_management import create_LOSO_dataset_dataloader, save_checkpoint
+from helpers.data_management import create_LOSO_dataset_dataloader, save_checkpoint, DatasetConfig
 from helpers.constants import *
 from helpers.modules import init_model_params
 
@@ -99,20 +99,14 @@ def evaluate_model(model:nn.Module, data_loader:DataLoader, scaler_y:StandardSca
 
 
 def loso_cross_validation(subjects:List[str],  
-                          tasks:List[str], 
                           model:nn.Module,
+                          dataset_cfg: DatasetConfig = DatasetConfig(),
                           batch_size = 32,
                           num_epoches:int = 30,
                           lr: float = 1e-3,
                           device = torch.device('cuda'),
-                          window_size = WINDOW_SIZE,
-                          stride = STRIDE,
-                          checkpoint_name: str | None = None,
-                          ablated_sensor: Literal["angle", "velocity", "imu_sim"] | None = None
+                          experiment_name: str = "",
                           ) -> Tuple[List[float], List[float]]:
-    if checkpoint_name is None:
-        checkpoint_name = model.__class__.__name__
-
     rmses = []
     r2s = []
     last_subject = subjects[0]
@@ -122,12 +116,10 @@ def loso_cross_validation(subjects:List[str],
         # 2. Fit scaler on TRAINING data only!
         dataset_dataloader = create_LOSO_dataset_dataloader(
                                 leave_one_out_subject = test_subj, 
-                                tasks = tasks, 
+                                dataset_cfg = dataset_cfg,
                                 subjects = subjects, 
-                                batch_size = batch_size, 
-                                window_size = window_size, 
-                                stride = stride,
-                                ablated_sensor = ablated_sensor)
+                                batch_size = batch_size,
+                                )
         
         if dataset_dataloader is None:
             print("skipping...")
@@ -146,7 +138,7 @@ def loso_cross_validation(subjects:List[str],
         r2s.append(r2)
 
     # just in case, save the last checkpoint
-    full_checkpoint_name  = checkpoint_name + "_" + last_subject
+    full_checkpoint_name  = experiment_name + model.__class__.__name__  + "_" + last_subject
     save_checkpoint(checkpoint, full_checkpoint_name)
     print("checkpoint saved in /saved_models/" + full_checkpoint_name)
 

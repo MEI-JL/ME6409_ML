@@ -4,12 +4,43 @@
 # this script will create a copy of original dataset
 # but removing all irrelevant files and columns, 
 # including those with NaN moments.
+
+# this script can be ran without my custom imports.
 import pandas as pd
 from pathlib import Path
-from helpers.data_management import get_subject_task_paths, find_suffix_csv_file
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, List
 
-from helpers.constants import *
+FEATURE_PREFIXES = ["angle", "velocity", "imu_sim", "moment"]
+IMU_COLS = [
+    'RThigh_V_ACCX','RThigh_V_ACCY','RThigh_V_ACCZ',
+    'RThigh_V_GYROX','RThigh_V_GYROY','RThigh_V_GYROZ',
+    'RShank_V_ACCX','RShank_V_ACCY','RShank_V_ACCZ',
+    'RShank_V_GYROX','RShank_V_GYROY','RShank_V_GYROZ',
+]
+PERIODIC_TASK_PREFIXES = ["incline_walk", "normal_walk"]
+NON_PERIODIC_TASK_PREFIXES = ["sit_to_stand", "squats"]
+SUBJECTS = ['AB01','AB02','AB03','AB05','AB06','AB07',
+            'AB08','AB09','AB10','AB11','AB12','AB13']
+
+
+def get_subject_task_paths(subject:str, task_prefix:str, 
+                           base:str = "ProcessedData") -> List[Any]:
+    base_path = Path(__file__).resolve().parent
+    subject_path = base_path / base / subject
+
+    if not subject_path.exists():
+        raise ValueError("cannot find subject path/ directory.")
+    paths_list = subject_path.glob(task_prefix + "*")
+
+    return sorted(paths_list)
+
+def find_suffix_csv_file(path:Path, suffix:str)->Path|None:
+    candidates = path.glob("*" + suffix + ".csv")
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
 
 # change function to keep original structure.
 def load_trial_paths(path: Any)-> Tuple[pd.DataFrame, Dict[str,Any]]:
