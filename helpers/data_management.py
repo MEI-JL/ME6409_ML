@@ -19,7 +19,7 @@ class DatasetConfig:
     test_tasks: List[str] | None = None # if not specified, the same as tasks
     window_size: int = WINDOW_SIZE
     stride: int = STRIDE
-    dataset_folder: str = "ProcessedData"
+    dataset_folder: str = "ProcessedDataTrimmed"
     ablated_sensors: List[SENSOR_NAMES | Any] = field(default_factory=list)
     full_horizon_output: bool = False # set to true in LSTM
 

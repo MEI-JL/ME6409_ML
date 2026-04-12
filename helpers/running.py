@@ -15,7 +15,7 @@ def train_model(
         model: nn.Module, 
         train_loader: DataLoader, 
         test_loader: DataLoader, 
-        num_epochs: int = 30, 
+        num_epochs: int = 5, 
         lr: float = 1e-3, 
         device: torch.device = torch.device('cuda')
     ) -> Dict[str,Any]:
