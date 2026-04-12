@@ -166,7 +166,7 @@ def loso_cross_validation(
     save_checkpoint(checkpoint, full_checkpoint_name)
     print("checkpoint saved in /saved_models/" + full_checkpoint_name)
 
-    print("mean rmse: " + np.mean(rmses))
-    print("mean r2: " + np.mean(r2s) )
+    print("mean rmse: " + str(np.mean(rmses)))
+    print("mean r2: " + str(np.mean(r2s)))
 
     return rmses, r2s, model
