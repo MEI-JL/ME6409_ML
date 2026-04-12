@@ -109,8 +109,8 @@ def _count_parameters(model:nn.Module) -> int:
 
 
 def loso_cross_validation(
-        subjects: List[str],  
         model_class: Type[nn.Module], # class, not object
+        subjects: List[str] = SUBJECTS_SUBSET,  
         dataset_cfg: DatasetConfig = DatasetConfig(),
         batch_size: int = 32,
         num_epoches: int = 10,

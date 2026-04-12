@@ -2,6 +2,8 @@ from typing import Literal
 
 SUBJECTS = ['AB01','AB02','AB03','AB05','AB06','AB07',
             'AB08','AB09','AB10','AB11','AB12','AB13']
+# should have data for all 4 tasks
+SUBJECTS_SUBSET = [ 'AB03', 'AB06', 'AB08', 'AB09'] 
 
 PERIODIC_TASK_PREFIXES = ["incline_walk", "normal_walk"]
 NON_PERIODIC_TASK_PREFIXES = ["sit_to_stand", "squats"]
