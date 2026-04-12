@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Type
 
 from helpers.data_management import create_LOSO_dataset_dataloader, save_checkpoint, DatasetConfig
 from helpers.constants import *
@@ -99,14 +99,17 @@ def evaluate_model(model:nn.Module, data_loader:DataLoader, scaler_y:StandardSca
 
 
 def loso_cross_validation(subjects:List[str],  
-                          model:nn.Module,
+                        #   model:nn.Module,
+                          model_class: Type[nn.Module], # class itself, not an object
                           dataset_cfg: DatasetConfig = DatasetConfig(),
                           batch_size = 32,
                           num_epoches:int = 30,
                           lr: float = 1e-3,
                           device = torch.device('cuda'),
                           experiment_name: str = "",
-                          ) -> Tuple[List[float], List[float]]:
+                          ) -> Tuple[List[float], List[float], nn.Module]:
+    
+    model = model_class(dataset_cfg.ablated_sensor).to(device)
     rmses = []
     r2s = []
     last_subject = subjects[0]
@@ -125,7 +128,7 @@ def loso_cross_validation(subjects:List[str],
             print("skipping...")
             continue
         last_subject = test_subj
-        train_dataset, test_dataset, train_dataloader, test_dataloader = dataset_dataloader
+        train_dataset, test_dataset, train_dataloader, test_dataloader = dataset_dataloader # unpack
         
         print("Dataset len: train=" + str(len(train_dataset)) + ", test=" + str(len(test_dataset)))
         # 3. Initialize a FRESH model (new weights each fold!)
@@ -142,4 +145,4 @@ def loso_cross_validation(subjects:List[str],
     save_checkpoint(checkpoint, full_checkpoint_name)
     print("checkpoint saved in /saved_models/" + full_checkpoint_name)
 
-    return rmses, r2s
+    return rmses, r2s, model

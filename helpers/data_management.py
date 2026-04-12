@@ -17,6 +17,7 @@ class DatasetConfig:
     stride: int = STRIDE
     dataset_folder: str = "ProcessedData"
     ablated_sensor: Literal["angle", "velocity", "imu_sim"] | None = None
+    full_horizon_output: bool = False # set to true in LSTM
 
 
 def get_subject_task_paths(subject:str, task_prefix:str, 
@@ -75,7 +76,8 @@ def _load_trial(path:Any, #str or posixpath?
 
 def _create_windows(X:np.ndarray, y:np.ndarray, 
                    dataset_samples_indices:List[int] | None = None,
-                   window_size = WINDOW_SIZE, stride= STRIDE
+                   window_size = WINDOW_SIZE, stride= STRIDE,
+                   full_horizon_output: bool = False
                    ) -> np.ndarray:
     """
     Create sliding windows from time series data.
@@ -89,7 +91,10 @@ def _create_windows(X:np.ndarray, y:np.ndarray,
             if dataset_samples_indices[i] != dataset_samples_indices[i + window_size-1]:
                 continue
         X_windows.append(X[i : i + window_size])
-        y_windows.append(y[i + window_size - 1])  # predict at the LAST time step
+        if full_horizon_output:
+            y_windows.append(y[i : i + window_size]) # perdict at every time step
+        else:
+            y_windows.append(y[i + window_size - 1])  # predict at the LAST time step
     return np.array(X_windows), np.array(y_windows)
 
 
@@ -167,19 +172,18 @@ class KneeMomentDataset(Dataset):
             self.scaler_y = scaler_y
             y_scaled = self.scaler_y.transform(dataset_y.reshape(-1, 1)).flatten()
 
-        # import pdb; pdb.set_trace()
-
         # split them into windows - this is the data pulled in getitem
         X_windows, y_windows = _create_windows(X_scaled, y_scaled, dataset_samples_indices, 
-                                                cfg.window_size, cfg.stride)
+                                                cfg.window_size, cfg.stride, cfg.full_horizon_output)
         # conv1d input: (N, C_in, L) / (batch, channels, length)
         # lstm input: (L, N, H_in) when batch_first = False (H is input size)
         # but for consistency, always place batches at the first dim.
         # permute in module instead.
-        # import pdb; pdb.set_trace()
-
         self.X = torch.tensor(X_windows, dtype=torch.float32).permute(0, 2, 1) # C, L
-        self.y = torch.tensor(y_windows, dtype=torch.float32).unsqueeze(-1)
+        if cfg.full_horizon_output:
+            self.y = torch.tensor(y_windows, dtype=torch.float32).permute(0, 2, 1)
+        else:
+            self.y = torch.tensor(y_windows, dtype=torch.float32).unsqueeze(-1)
 
     def __len__(self):
         return len(self.X)

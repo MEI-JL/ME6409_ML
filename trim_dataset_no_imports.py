@@ -34,6 +34,7 @@ def get_subject_task_paths(subject:str, task_prefix:str,
 
     return sorted(paths_list)
 
+
 def find_suffix_csv_file(path:Path, suffix:str)->Path|None:
     candidates = path.glob("*" + suffix + ".csv")
     for candidate in candidates:
