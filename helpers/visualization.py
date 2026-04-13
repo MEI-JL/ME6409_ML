@@ -1,10 +1,27 @@
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
 from helpers.constants import *
 from helpers.running import evaluate_model
 from helpers.data_management import create_LOSO_dataset_dataloader, DatasetConfig
 import torch
 import torch.nn as nn
+
+
+# matplotlib global settings
+mpl.rcParams.update({
+    'font.size': 8,
+    "figure.dpi": 200,
+    "savefig.dpi": 600,              # very high-res when saving
+    # "savefig.format": "pdf",         # vector output preferred
+    # Fonts
+    # "font.family": "serif",
+    # "font.serif": ["Times New Roman"],  # IEEE default
+    # Axes
+    "axes.linewidth": 1.5,
+    # Lines
+    "lines.linewidth": 2,
+})
 
 def inspect_knee_moment_dataset(x,y) -> None:
 
@@ -86,7 +103,7 @@ def prediction_overlay(targets, preds, rmse, r2,
                        title = ""
                        ) -> None:
     # change this to meet ieee format
-    plt.figure(figsize=(3.5, 1.3)) # 1 row
+    plt.figure(figsize=(3.5, 2)) # 1 row
 
     n_plot = min(300, len(targets))
     time_axis = np.arange(n_plot) / 200  # convert to seconds
@@ -100,10 +117,11 @@ def prediction_overlay(targets, preds, rmse, r2,
 
     plt.plot(time_axis, targets[indices], label='Actual', alpha=0.8, linewidth=1.5)
     plt.plot(time_axis, preds[indices], label='Predicted', alpha=0.8, linewidth=1.5)
-    plt.ylabel('Knee Moment (Nm)')
+    # plt.ylabel('Knee Moment (Nm)')
+    plt.ylabel('Moment (Nm)')
     plt.xlabel('Time (s)')
     plt.legend()
-    plt.title(f'{title} |  RMSE={rmse:.4f} Nm, R\u00b2={r2:.4f}',fontsize=8)
+    plt.title(f'{title} |  RMSE={rmse:.4f} Nm, R\u00b2={r2:.4f}')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
