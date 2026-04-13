@@ -45,10 +45,11 @@ class ConvBlock(nn.Module):
             in_channels:int, 
             out_channels:int,
             kernel_size:int=5, 
-            padding:int=2, 
+            # padding:int=2, 
             # dilation:int=1
         ):
         super().__init__()
+        padding = int(kernel_size/2) # floor
         self.conv = nn.Sequential(
             nn.Conv1d(
                 in_channels, out_channels, 
@@ -66,15 +67,18 @@ class ConvBlock(nn.Module):
 class KneeCNN(nn.Module):
     def __init__(
             self, 
-            ablated_sensors: SENSOR_NAMES | None = None,
+            ablated_sensors: List[SENSOR_NAMES|Any] = [],
             hidden_layer_size: int = HIDDEN_LAYER_SIZE
         ):
+        # saw some time series data model that starts with larger kernel 
+        # larger receptive field 
         super().__init__()
         in_channels = _get_ablated_channels_n(ablated_sensors)
         self.encoder = nn.Sequential(
-            ConvBlock(in_channels, hidden_layer_size),
-            ConvBlock(hidden_layer_size, hidden_layer_size),
-            ConvBlock(hidden_layer_size, hidden_layer_size),
+            ConvBlock(in_channels, hidden_layer_size, 11),
+            ConvBlock(hidden_layer_size, hidden_layer_size, 9),
+            ConvBlock(hidden_layer_size, hidden_layer_size, 7),
+            ConvBlock(hidden_layer_size, hidden_layer_size, 5),
         )
         self.pool = nn.AdaptiveAvgPool1d(1)  # collapse time dim -> 1
         self.regressor = nn.Sequential(
@@ -128,15 +132,16 @@ class KneeTCN(nn.Module):
     # simple implementation without residual layer.
     def __init__(
             self, 
-            ablated_sensors: SENSOR_NAMES | None = None,
+            ablated_sensors: List[SENSOR_NAMES|Any] = [],
             hidden_layer_size: int = HIDDEN_LAYER_SIZE
         ):
         super().__init__()
         in_channels = _get_ablated_channels_n(ablated_sensors)
         self.encoder = nn.Sequential(
-            DilatedCausalConvBlock(in_channels, hidden_layer_size, dilation = 1),
-            DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, dilation = 2),
-            DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, dilation = 4),
+            DilatedCausalConvBlock(in_channels, hidden_layer_size, 11, 1),
+            DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, 9, 2),
+            DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, 7, 4),
+            DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, 5, 8),
         )
         self.pool = nn.AdaptiveAvgPool1d(1)  # collapse time dim -> 1
         self.regressor = nn.Sequential(
@@ -160,12 +165,12 @@ class KneeLSTM(nn.Module):
     # input: (L, Hin); output: (L, Hout).
     def __init__(
             self, 
-            ablated_sensors: SENSOR_NAMES | None = None,
+            ablated_sensors: List[SENSOR_NAMES|Any] = [],
             hidden_layer_size: int = HIDDEN_LAYER_SIZE
         ):
         super().__init__()
         in_channels = _get_ablated_channels_n(ablated_sensors)
-        self.encoder = nn.LSTM(in_channels, hidden_layer_size, 2, dropout=0.1)
+        self.encoder = nn.LSTM(in_channels, hidden_layer_size, 3, dropout=0.1)
         self.pool = nn.AdaptiveAvgPool1d(1)  # collapse time dim -> 1
         self.regressor = nn.Sequential(
             nn.Linear(hidden_layer_size, hidden_layer_size),
