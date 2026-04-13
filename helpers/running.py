@@ -121,16 +121,16 @@ def loso_cross_validation(
     ) -> Tuple[List[float], List[float], nn.Module]:
     ''' main evaluation function'''
     torch.manual_seed(0)
-    
-    model = model_class(dataset_cfg.ablated_sensors,hidden_layer_size
-                        ).to(device)
+    # weightnorm having problems...
+    # model = model_class(dataset_cfg.ablated_sensors,hidden_layer_size
+    #                     ).to(device)
     rmses = []
     r2s = []
     last_subject = subjects[0]
-    checkpoint_name  = experiment_name + model.__class__.__name__
-    print("Model "+ checkpoint_name + " parameter size: "
-          + str(_count_parameters(model))
-          )
+    # checkpoint_name  = experiment_name + model.__class__.__name__
+    # print("Model "+ checkpoint_name + " parameter size: "
+    #       + str(_count_parameters(model))
+    #       )
     for test_subj in subjects:
         print("Evaluating for test subject " + test_subj)
         # 1. Gather train/test data
@@ -149,7 +149,9 @@ def loso_cross_validation(
         print(f'Train: {len(train_dataset)} windows | ',
               f'Test: {len(test_dataset)} windows')
         # 3. Initialize a FRESH model (new weights each fold!)
-        init_model_params(model)
+        # init_model_params(model)
+        model = model_class(dataset_cfg.ablated_sensors,hidden_layer_size
+                        ).to(device)
         # 4. Train -> Evaluate -> Store RMSE, R² for this fold
         checkpoint = train_model(model, 
                                  train_dataloader, test_dataloader, 
@@ -162,6 +164,7 @@ def loso_cross_validation(
         last_subject = test_subj
 
     # just in case, save the last checkpoint
+    checkpoint_name  = experiment_name + model.__class__.__name__
     full_checkpoint_name  = checkpoint_name + "_" + last_subject
     save_checkpoint(checkpoint, full_checkpoint_name)
     print("checkpoint saved in /saved_models/" + full_checkpoint_name)

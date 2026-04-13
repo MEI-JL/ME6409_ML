@@ -42,32 +42,32 @@ def _get_ablated_channels_n(
     return n_channels
 
 class ConvBlock(nn.Module):
+    # https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9751372
     def __init__(
             self, 
             in_channels:int, 
             out_channels:int,
-            kernel_size:int=3, 
-            # padding:int=2, 
-            # dilation:int=1
+            kernel_size:int=5, 
         ):
         super().__init__()
         padding = int(kernel_size/2) # floor
         self.conv = nn.Sequential(
-            weight_norm(nn.Conv1d(
+                nn.Conv1d(
                 in_channels, out_channels, 
                 kernel_size = kernel_size,
                 padding = padding,
-                # dilation = dilation
-                )
             ),
+            nn.BatchNorm1d(out_channels),
             nn.ReLU(),
-            nn.Dropout(p=0.1),
+            nn.Dropout(p=0.2),
         )
     
     def forward(self, x:torch.Tensor) -> torch.Tensor:
         return self.conv(x)
 
+# weightnorm might not be fully reset...
 class KneeCNN(nn.Module):
+    # https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9751372
     def __init__(
             self, 
             ablated_sensors: List[SENSOR_NAMES|Any] = [],
@@ -81,14 +81,14 @@ class KneeCNN(nn.Module):
             ConvBlock(in_channels, hidden_layer_size),
             ConvBlock(hidden_layer_size, hidden_layer_size),
             ConvBlock(hidden_layer_size, hidden_layer_size),
-            ConvBlock(hidden_layer_size, hidden_layer_size),
+            # ConvBlock(hidden_layer_size, hidden_layer_size),
         )
         self.pool = nn.AdaptiveAvgPool1d(1)  # collapse time dim -> 1
         self.regressor = nn.Sequential(
-            nn.Linear(hidden_layer_size, hidden_layer_size),
+            nn.Linear(hidden_layer_size, int(hidden_layer_size/2)),
             nn.ReLU(),
-            nn.Dropout(p=0.1),
-            nn.Linear(hidden_layer_size, 1),
+            nn.Dropout(p=0.2),
+            nn.Linear(int(hidden_layer_size/2), 1),
         )
 
     def forward(self, x:torch.Tensor) -> torch.Tensor:
@@ -122,7 +122,7 @@ class DilatedCausalConvBlock(nn.Module):
                 )
             ),
             nn.ReLU(),
-            nn.Dropout(p=0.1),
+            nn.Dropout(p=0.2),
         )
     
     def forward(self, x:torch.Tensor) -> torch.Tensor:
@@ -144,13 +144,14 @@ class KneeTCN(nn.Module):
             DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, dilation= 2),
             DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, dilation= 4),
             DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, dilation= 8),
+            DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, dilation= 16),
         )
         self.pool = nn.AdaptiveAvgPool1d(1)  # collapse time dim -> 1
         self.regressor = nn.Sequential(
-            nn.Linear(hidden_layer_size, hidden_layer_size),
+            nn.Linear(hidden_layer_size, int(hidden_layer_size/2)),
             nn.ReLU(),
-            nn.Dropout(p=0.1),
-            nn.Linear(hidden_layer_size, 1),
+            nn.Dropout(p=0.2),
+            nn.Linear(int(hidden_layer_size/2), 1),
         )
 
     def forward(self, x:torch.Tensor)->torch.Tensor:
@@ -175,10 +176,10 @@ class KneeLSTM(nn.Module):
         self.encoder = nn.LSTM(in_channels, int(hidden_layer_size/2), 4, dropout=0.1)
         self.pool = nn.AdaptiveAvgPool1d(1)  # collapse time dim -> 1
         self.regressor = nn.Sequential(
-            nn.Linear(hidden_layer_size, hidden_layer_size),
+            nn.Linear(hidden_layer_size, int(hidden_layer_size/2)),
             nn.ReLU(),
-            nn.Dropout(p=0.1),
-            nn.Linear(hidden_layer_size, 1),
+            nn.Dropout(p=0.2),
+            nn.Linear(int(hidden_layer_size/2), 1),
         )
 
     def forward(self, x:torch.Tensor)-> torch.Tensor:
