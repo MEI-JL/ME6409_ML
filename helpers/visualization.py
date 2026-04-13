@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from helpers.constants import *
 
 def inspect_knee_moment_dataset(x,y) -> None:
 
@@ -74,17 +75,29 @@ def inspect_example_data(df):
     print('Notice: periodic tasks show clear repeating patterns, non-periodic tasks do not!')
 
 
-def prediction_overlay(targets, preds, rmse, r2):
+def prediction_overlay(targets, preds, rmse, r2, 
+                       full_horizon_output: bool = False, # set to true in LSTM
+                       window_size: int = WINDOW_SIZE,
+                       interval = [0,300]
+                       ) -> None:
+    # TODO change this for LSTM: take the last sample in each window
     plt.figure(figsize=(14, 4))
     n_plot = min(300, len(targets))
     time_axis = np.arange(n_plot) / 200  # convert to seconds
 
-    plt.plot(time_axis, targets[:n_plot], label='Actual', alpha=0.8, linewidth=1.5)
-    plt.plot(time_axis, preds[:n_plot], label='Predicted', alpha=0.8, linewidth=1.5)
+    if full_horizon_output:
+        indices = np.arange(interval[0]*window_size,
+                            interval[1]*window_size,
+                            window_size)
+    else:
+        indices = np.arange(interval[0], interval[1])
+
+    plt.plot(time_axis, targets[indices], label='Actual', alpha=0.8, linewidth=1.5)
+    plt.plot(time_axis, preds[indices], label='Predicted', alpha=0.8, linewidth=1.5)
     plt.ylabel('Knee Moment (Nm)')
     plt.xlabel('Time (s)')
     plt.legend()
-    plt.title(f'CNN Prediction vs Ground Truth  |  RMSE={rmse:.4f} Nm, R\u00b2={r2:.4f}')
+    plt.title(f'Prediction vs Ground Truth  |  RMSE={rmse:.4f} Nm, R\u00b2={r2:.4f}')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()

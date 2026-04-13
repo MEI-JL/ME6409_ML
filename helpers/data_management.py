@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+# import csv
 import torch
 from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
@@ -244,20 +245,27 @@ def create_LOSO_dataset_dataloader(
 def save_checkpoint(
         checkpoint: Dict[str,Any], 
         model_name: str, 
-        base_path_name: str = "/saved_models"
+        folder_name: str = "generated_data"
     ) -> None:
-    Path(base_path_name).parent.mkdir(parents=True, exist_ok=True)
-    saved_model_path = Path(base_path_name)
 
-    torch.save(checkpoint, "." + str(saved_model_path / (model_name +".pt")))
+    base_path = Path(__file__).resolve().parent.parent
+    folder_path = base_path / folder_name
+
+    # Path(base_path_name).parent.mkdir(parents=True, exist_ok=True)
+    folder_path.mkdir(parents=True, exist_ok=True)
+    # saved_model_path = Path(base_path_name)
+
+    torch.save(checkpoint, str(folder_path / (model_name +".pt")))
 
 def load_model(
         model: torch.nn.Module, 
         model_name: str,
-        base_path_name: str = "/saved_models"
+        folder_name: str = "generated_data"
     ) -> None:
+    base_path = Path(__file__).resolve().parent.parent
+    folder_path = base_path / folder_name
     # saved_model_path = Path(base_path_name)
-    file_path =  "." + str(Path(base_path_name) / (model_name +".pt"))
+    file_path =  str(folder_path / (model_name +".pt"))
     checkpoint = torch.load(file_path, weights_only=True)
 
     model.load_state_dict(checkpoint['model_state_dict'])
@@ -267,11 +275,13 @@ def load_checkpoint(
         optimizer: torch.optim.Adam,
         lr_scheduler: torch.optim.lr_scheduler.ExponentialLR,
         model_name: str,
-        base_path_name: str = "/saved_models"
+        folder_name: str = "generated_data"
     )-> Tuple[int, List[float],List[float]]:
+    
+    base_path = Path(__file__).resolve().parent.parent
+    folder_path = base_path / folder_name
     # saved_model_path = Path(base_path_name)
-    file_path =  "." + str(Path(base_path_name) / (model_name +".pt"))
-
+    file_path = str(folder_path / (model_name +".pt"))
     checkpoint = torch.load(file_path, weights_only=True)
 
     model.load_state_dict(checkpoint['model_state_dict'])
@@ -281,3 +291,43 @@ def load_checkpoint(
     return checkpoint['epoch'], \
         checkpoint['train_losses'], checkpoint['test_losses']
 
+
+class Logger:
+    def __init__(
+            self,
+            file_name: str,
+            folder_name: str = "generated_data"
+    ): # using pandas instead of csv to prevent frequent read/write
+        
+        base_path = Path(__file__).resolve().parent.parent
+        folder_path = base_path / folder_name
+
+        # import pdb; pdb.set_trace()
+
+        # Path(base_path_name).parent.mkdir(parents=True, exist_ok=True)
+        folder_path.mkdir(parents=True, exist_ok=True)
+
+        self.file_path = str(folder_path / (file_name +".csv"))
+        self.df = None
+        self.epoches = None
+        self.row = 0
+
+    def update_row(self, subject:str, rmse:float, r2:float, 
+                   training_loss:List[float], test_loss:List[float]) -> None:
+        if self.df is None: # init
+            columns = ["subject", "rmse", "r2", "epoches"]
+            self.epoches = len(training_loss)
+            # here loss is recorded every epoch.
+            for epoch in range(self.epoches):
+                columns.append("training_loss_" + str(epoch))
+            for epoch in range(self.epoches):
+                columns.append("test_loss_" + str(epoch))
+                
+            self.df = pd.DataFrame(columns=columns)
+
+        self.df.loc[self.row] = [subject] + [rmse] + [r2] \
+            + [self.epoches] + training_loss + test_loss
+        self.row = self.row+1
+    def write_csv(self) -> None:
+        # import pdb; pdb.set_trace()
+        self.df.to_csv(str(self.file_path), index = False)

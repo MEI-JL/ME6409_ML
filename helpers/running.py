@@ -5,11 +5,11 @@ from torch.utils.data import DataLoader
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
 from typing import List, Tuple, Dict, Any, Type
-from helpers.data_management import (DatasetConfig,
+from helpers.data_management import (DatasetConfig, Logger,
                                      create_LOSO_dataset_dataloader, 
                                      save_checkpoint)
 from helpers.constants import *
-from helpers.modules import init_model_params
+# from helpers.modules import init_model_params
 
 def train_model(
         model: nn.Module, 
@@ -118,19 +118,15 @@ def loso_cross_validation(
         device: torch.device = torch.device('cuda'),
         experiment_name: str = "",
         hidden_layer_size: int = HIDDEN_LAYER_SIZE,
+        base_path_name: str = "generated_data" # not only saved models
     ) -> Tuple[List[float], List[float], nn.Module]:
     ''' main evaluation function'''
     torch.manual_seed(0)
-    # weightnorm having problems...
-    # model = model_class(dataset_cfg.ablated_sensors,hidden_layer_size
-    #                     ).to(device)
     rmses = []
     r2s = []
     last_subject = subjects[0]
-    # checkpoint_name  = experiment_name + model.__class__.__name__
-    # print("Model "+ checkpoint_name + " parameter size: "
-    #       + str(_count_parameters(model))
-    #       )
+    logger = Logger(experiment_name + model_class.__name__, 
+                    base_path_name)
     for test_subj in subjects:
         print("Evaluating for test subject " + test_subj)
         # 1. Gather train/test data
@@ -159,6 +155,9 @@ def loso_cross_validation(
         _, _, rmse, r2 = evaluate_model(model, test_dataloader, 
                                         train_dataset.scaler_y)
         # update storage
+        logger.update_row( test_subj, rmse, r2,
+            checkpoint["train_losses"], checkpoint["test_losses"]
+            )
         rmses.append(rmse)
         r2s.append(r2)
         last_subject = test_subj
@@ -166,10 +165,20 @@ def loso_cross_validation(
     # just in case, save the last checkpoint
     checkpoint_name  = experiment_name + model.__class__.__name__
     full_checkpoint_name  = checkpoint_name + "_" + last_subject
-    save_checkpoint(checkpoint, full_checkpoint_name)
-    print("checkpoint saved in /saved_models/" + full_checkpoint_name)
+    save_checkpoint(checkpoint, full_checkpoint_name, base_path_name)
+    logger.write_csv()
+    
+    # display results
+    print("checkpoint saved in " + base_path_name 
+          +"/" + full_checkpoint_name + ".pth")
 
-    print("mean rmse: " + str(np.mean(rmses)))
-    print("mean r2: " + str(np.mean(r2s)))
+    print("Model "+ checkpoint_name + " parameter size: "
+          + str(_count_parameters(model))
+          )
+
+    print("rmse: mean  = " + str(np.mean(rmses)))
+    print(rmses)
+    print("r2: mean  = " + str(np.mean(r2s)))
+    print(r2s)
 
     return rmses, r2s, model

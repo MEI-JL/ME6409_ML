@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn.utils import weight_norm
+from torch.nn.utils.parametrizations import weight_norm
 from typing import List, Any
 from helpers.constants import *
 
@@ -169,7 +169,8 @@ class KneeLSTM(nn.Module):
     def __init__(
             self, 
             ablated_sensors: List[SENSOR_NAMES|Any] = [],
-            hidden_layer_size: int = HIDDEN_LAYER_SIZE
+            hidden_layer_size: int = HIDDEN_LAYER_SIZE,
+            # reset_states: bool = True # always true for our case w/ windows
         ):
         super().__init__()
         in_channels = _get_ablated_channels_n(ablated_sensors)
@@ -186,6 +187,7 @@ class KneeLSTM(nn.Module):
         ''' input x: (batch, channels, window_size) 32,14,50'''
         # change to (window_size, batch, channels)
         x = x.permute(2, 0, 1) # 50,32,14
+        # (h_0, c_0) defaults to zeros if not provided.
         x, _ = self.encoder(x) # (window_size, batch, channels), (hn, cn)
         # instead of pooling, pass each state into regressor.
         # (l,b,c) -> (l*b, c) -> (l,b,c) -> (b, c, l)
