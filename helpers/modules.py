@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn.utils import weight_norm
 from typing import List, Any
 from helpers.constants import *
 
@@ -8,7 +9,8 @@ def init_model_params(model:nn.Module) -> None:
     def _init_params(m:nn.Module) -> None:
         if isinstance(m, (nn.Conv1d, nn.Linear)):
             nn.init.xavier_normal_(m.weight)
-            m.bias.data.zero_() # 0.01?
+            # m.bias.data.zero_()
+            m.bias.data.fill_(0.01) # try this for relu activation
         elif isinstance(m,(nn.RNN, nn.LSTM)):
             for layer_params in m.all_weights: # n layers
                 # ['weight_ih_l0', 'weight_hh_l0', 'bias_ih_l0', 'bias_hh_l0']
@@ -44,18 +46,19 @@ class ConvBlock(nn.Module):
             self, 
             in_channels:int, 
             out_channels:int,
-            kernel_size:int=5, 
+            kernel_size:int=3, 
             # padding:int=2, 
             # dilation:int=1
         ):
         super().__init__()
         padding = int(kernel_size/2) # floor
         self.conv = nn.Sequential(
-            nn.Conv1d(
+            weight_norm(nn.Conv1d(
                 in_channels, out_channels, 
                 kernel_size = kernel_size,
                 padding = padding,
                 # dilation = dilation
+                )
             ),
             nn.ReLU(),
             nn.Dropout(p=0.1),
@@ -75,10 +78,10 @@ class KneeCNN(nn.Module):
         super().__init__()
         in_channels = _get_ablated_channels_n(ablated_sensors)
         self.encoder = nn.Sequential(
-            ConvBlock(in_channels, hidden_layer_size, 11),
-            ConvBlock(hidden_layer_size, hidden_layer_size, 9),
-            ConvBlock(hidden_layer_size, hidden_layer_size, 7),
-            ConvBlock(hidden_layer_size, hidden_layer_size, 5),
+            ConvBlock(in_channels, hidden_layer_size),
+            ConvBlock(hidden_layer_size, hidden_layer_size),
+            ConvBlock(hidden_layer_size, hidden_layer_size),
+            ConvBlock(hidden_layer_size, hidden_layer_size),
         )
         self.pool = nn.AdaptiveAvgPool1d(1)  # collapse time dim -> 1
         self.regressor = nn.Sequential(
@@ -106,20 +109,18 @@ class DilatedCausalConvBlock(nn.Module):
             self, 
             in_channels:int, 
             out_channels:int,
-            kernel_size:int=5, 
+            kernel_size:int=2, 
             dilation:int=1
         ):
         super().__init__()
         self.conv = nn.Sequential(
             nn.ConstantPad1d((dilation*(kernel_size - 1), 0), 0.0,),
-            nn.Conv1d(
+            weight_norm(nn.Conv1d(
                 in_channels, out_channels, 
                 kernel_size = kernel_size,
-                # padding = (dilation*(kernel_size - 1), 0), # zeros
                 dilation = dilation
+                )
             ),
-            # add WeightNorm? if we do so, do the same for regular cnn.
-            # https://docs.pytorch.org/docs/stable/generated/torch.nn.utils.parametrizations.weight_norm.html
             nn.ReLU(),
             nn.Dropout(p=0.1),
         )
@@ -130,6 +131,7 @@ class DilatedCausalConvBlock(nn.Module):
 
 class KneeTCN(nn.Module):
     # simple implementation without residual layer.
+    # from Molinaro 2024 paper and https://github.com/locuslab/TCN/blob/master/TCN/tcn.py
     def __init__(
             self, 
             ablated_sensors: List[SENSOR_NAMES|Any] = [],
@@ -138,10 +140,10 @@ class KneeTCN(nn.Module):
         super().__init__()
         in_channels = _get_ablated_channels_n(ablated_sensors)
         self.encoder = nn.Sequential(
-            DilatedCausalConvBlock(in_channels, hidden_layer_size, 11, 1),
-            DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, 9, 2),
-            DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, 7, 4),
-            DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, 5, 8),
+            DilatedCausalConvBlock(in_channels, hidden_layer_size, dilation= 1),
+            DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, dilation= 2),
+            DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, dilation= 4),
+            DilatedCausalConvBlock(hidden_layer_size, hidden_layer_size, dilation= 8),
         )
         self.pool = nn.AdaptiveAvgPool1d(1)  # collapse time dim -> 1
         self.regressor = nn.Sequential(
@@ -170,7 +172,7 @@ class KneeLSTM(nn.Module):
         ):
         super().__init__()
         in_channels = _get_ablated_channels_n(ablated_sensors)
-        self.encoder = nn.LSTM(in_channels, hidden_layer_size, 3, dropout=0.1)
+        self.encoder = nn.LSTM(in_channels, int(hidden_layer_size/2), 4, dropout=0.1)
         self.pool = nn.AdaptiveAvgPool1d(1)  # collapse time dim -> 1
         self.regressor = nn.Sequential(
             nn.Linear(hidden_layer_size, hidden_layer_size),
