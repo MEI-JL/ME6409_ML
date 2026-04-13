@@ -85,7 +85,9 @@ def prediction_overlay(targets, preds, rmse, r2,
                        interval = [0,300],
                        title = ""
                        ) -> None:
-    plt.figure(figsize=(14, 4))
+    # change this to meet ieee format
+    plt.figure(figsize=(3.5, 1.3)) # 1 row
+
     n_plot = min(300, len(targets))
     time_axis = np.arange(n_plot) / 200  # convert to seconds
 
@@ -101,7 +103,7 @@ def prediction_overlay(targets, preds, rmse, r2,
     plt.ylabel('Knee Moment (Nm)')
     plt.xlabel('Time (s)')
     plt.legend()
-    plt.title(f'{title} Prediction vs Ground Truth  |  RMSE={rmse:.4f} Nm, R\u00b2={r2:.4f}')
+    plt.title(f'{title} |  RMSE={rmse:.4f} Nm, R\u00b2={r2:.4f}',fontsize=8)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
@@ -127,5 +129,5 @@ def evaluate_visualize_model(
                        full_horizon_output=dataset_cfg.full_horizon_output,
                        window_size = dataset_cfg.window_size,
                        interval = interval,
-                       title = [test_subject + " " +model.__class__.__name__]
+                       title = test_subject + " " +model.__class__.__name__
                        )
