@@ -176,7 +176,7 @@ class KneeLSTM(nn.Module):
         self.encoder = nn.LSTM(in_channels, int(hidden_layer_size/2), 4, dropout=0.1)
         self.pool = nn.AdaptiveAvgPool1d(1)  # collapse time dim -> 1
         self.regressor = nn.Sequential(
-            nn.Linear(hidden_layer_size, int(hidden_layer_size/2)),
+            nn.Linear(int(hidden_layer_size/2), int(hidden_layer_size/2)),
             nn.ReLU(),
             nn.Dropout(p=0.2),
             nn.Linear(int(hidden_layer_size/2), 1),
