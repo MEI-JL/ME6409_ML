@@ -1,6 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from helpers.constants import *
+from helpers.running import evaluate_model
+from helpers.data_management import create_LOSO_dataset_dataloader, DatasetConfig
+import torch
+import torch.nn as nn
 
 def inspect_knee_moment_dataset(x,y) -> None:
 
@@ -78,9 +82,9 @@ def inspect_example_data(df):
 def prediction_overlay(targets, preds, rmse, r2, 
                        full_horizon_output: bool = False, # set to true in LSTM
                        window_size: int = WINDOW_SIZE,
-                       interval = [0,300]
+                       interval = [0,300],
+                       title = ""
                        ) -> None:
-    # TODO change this for LSTM: take the last sample in each window
     plt.figure(figsize=(14, 4))
     n_plot = min(300, len(targets))
     time_axis = np.arange(n_plot) / 200  # convert to seconds
@@ -97,7 +101,31 @@ def prediction_overlay(targets, preds, rmse, r2,
     plt.ylabel('Knee Moment (Nm)')
     plt.xlabel('Time (s)')
     plt.legend()
-    plt.title(f'Prediction vs Ground Truth  |  RMSE={rmse:.4f} Nm, R\u00b2={r2:.4f}')
+    plt.title(f'{title} Prediction vs Ground Truth  |  RMSE={rmse:.4f} Nm, R\u00b2={r2:.4f}')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
+
+
+# wrapped some functions together
+def evaluate_visualize_model(
+        model:nn.Module,
+        test_subject:str,
+        interval = [0,300],
+        dataset_cfg:DatasetConfig=DatasetConfig(),
+        device: torch.device = torch.device('cuda')    
+    ):
+
+    train_dataset, _, _, test_dataloader = \
+        create_LOSO_dataset_dataloader(test_subject, dataset_cfg=dataset_cfg)
+
+    preds, targets, rmse, r2 = evaluate_model(model, test_dataloader,
+                                            train_dataset.scaler_y,
+                                            device=device)
+    
+    prediction_overlay(targets, preds, rmse, r2, 
+                       full_horizon_output=dataset_cfg.full_horizon_output,
+                       window_size = dataset_cfg.window_size,
+                       interval = interval,
+                       title = [test_subject + " " +model.__class__.__name__]
+                       )
